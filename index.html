@@ -44,12 +44,32 @@
     }
     header { padding: 28px clamp(24px, 6vw, 80px); }
     .brand {
-      font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
-      font-size: 19px;
-      font-weight: 600;
-      letter-spacing: -0.06em;
+      display: inline-flex;
+      align-items: center;
+      min-height: 34px;
+      padding: 0;
+      border: 0;
+      background: none;
+      cursor: pointer;
     }
-    .brand span { color: #4294dd; }
+    .brand:focus-visible { outline: 2px solid #4294dd; outline-offset: 5px; border-radius: 2px; }
+    .brand svg {
+      display: block;
+      width: 41px;
+      height: 32px;
+      overflow: visible;
+      font-family: monospace;
+      font-size: 100px;
+      font-weight: 550;
+      font-style: normal;
+    }
+    .brand .logo-ink, .brand .logo-md { fill: #f6f8fb; }
+    .brand .logo-accent, .brand.is-expanded .logo-md { fill: #4294dd; }
+    .brand .logo-md { transition: fill 150ms ease-out; }
+    .brand .logo-dot { transform-box: fill-box; transform-origin: center; }
+    @media (prefers-reduced-motion: reduce) {
+      .brand .logo-md { transition: none; }
+    }
     main { align-self: center; padding: 64px 24px 0px; text-align: center; }
     h1 {
       margin: 0;
@@ -108,7 +128,23 @@
   </style>
 </head>
 <body>
-  <header><div class="brand">portable<span>.md</span></div></header>
+  <header>
+    <button class="brand brand-logo" type="button" aria-label="portable.md logo" aria-expanded="false" title="Hover to unfold portable.md; click to keep it open">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 75 166 130" aria-hidden="true" focusable="false">
+        <g data-logo-glyph="m" transform="translate(45 0)"><text class="logo-md" x="0" y="166" transform="scale(1.15 1)">m</text></g>
+        <g data-logo-glyph="d" transform="translate(89 0)"><text class="logo-md" x="0" y="166" transform="scale(1.15 1)">d</text></g>
+        <g data-logo-glyph="p"><text class="logo-accent" x="0" y="166" transform="scale(1.15 1)">p</text></g>
+        <g data-logo-glyph="o"><text class="logo-ink" x="0" y="166" transform="scale(1.15 1)" opacity="0">o</text></g>
+        <g data-logo-glyph="r"><text class="logo-ink" x="0" y="166" transform="scale(1.15 1)" opacity="0">r</text></g>
+        <g data-logo-glyph="t"><text class="logo-ink" x="0" y="166" transform="scale(1.15 1)" opacity="0">t</text></g>
+        <g data-logo-glyph="a"><text class="logo-ink" x="0" y="166" transform="scale(1.15 1)" opacity="0">a</text></g>
+        <g data-logo-glyph="b"><text class="logo-ink" x="0" y="166" transform="scale(1.15 1)" opacity="0">b</text></g>
+        <g data-logo-glyph="l"><text class="logo-ink" x="0" y="166" transform="scale(1.15 1)" opacity="0">l</text></g>
+        <g data-logo-glyph="e"><text class="logo-ink" x="0" y="166" transform="scale(1.15 1)" opacity="0">e</text></g>
+        <g data-logo-glyph="."><circle class="logo-accent logo-dot" cx="7" cy="159" r="7" opacity="0"/></g>
+      </svg>
+    </button>
+  </header>
   <main>
     <h1>Coming soon<span style="color: #4294dd;">.</span></h1>
     <p class="description">Static by design. Portable by nature.<br>Your knowledge, anywhere.</p>
@@ -123,4 +159,127 @@
   </figure>
 
 
+  <script>
+// The teaser header uses the favorite settings from the pmd logo study.
+// Each arriving letter starts at the trailing edge of the preceding letter.
+(function initBrandLogo() {
+	const button = document.querySelector('.brand-logo');
+	if (!button) return;
+	const svg = button.querySelector('svg');
+	const order = 'ortable';
+	const glyphs = Object.fromEntries(['p', ...order, 'm', 'd', '.'].map(char =>
+		[char, button.querySelector(`[data-logo-glyph="${char}"]`)]));
+	const widths = {};
+	const layouts = [];
+	const lettersMs = 200, delayMs = 110, dotMs = 150, bump = 8;
+	const totalMs = lettersMs + delayMs + dotMs;
+	const stepMs = lettersMs / order.length;
+	const mix = (a, b, t) => a + (b - a) * t;
+	const clamp = value => Math.max(0, Math.min(1, value));
+	const ease = value => 1 - (1 - value) ** 3;
+	let time = 0, target = 0, lastFrame = 0, ticking = false, pinned = false;
+	let placed = {};
+
+	function wordLayout(count, period = false) {
+		const chars = ['p', ...order.slice(0, count), ...(period ? ['.'] : []), 'm', 'd'];
+		const positions = {};
+		let x = 0;
+		chars.forEach((char, index) => {
+			positions[char] = x;
+			const gap = period && char === 'e' ? -8 : period && char === '.' ? 5 : -15.5;
+			x += widths[char] + (index < chars.length - 1 ? gap : 0);
+		});
+		return positions;
+	}
+
+	function measure() {
+		for (const [char, group] of Object.entries(glyphs)) {
+			widths[char] = char === '.' ? 14 : group.firstElementChild.getComputedTextLength() * 1.15;
+		}
+		const left = Math.min(-45, 0, 44);
+		layouts.push({ p: -45 - left, m: -left, d: 44 - left });
+		for (let count = 1; count <= order.length; count++) layouts.push(wordLayout(count));
+		layouts.push(wordLayout(order.length, true));
+		draw(0);
+	}
+
+	function place(char, x, opacity = 1, scale = 1) {
+		const group = glyphs[char];
+		const shape = group.firstElementChild;
+		group.setAttribute('transform', `translate(${x.toFixed(2)} 0)`);
+		shape.setAttribute('opacity', opacity.toFixed(3));
+		if (char === '.') shape.style.transform = scale === 1 ? '' : `scale(${scale.toFixed(3)})`;
+		placed[char] = x;
+	}
+
+	function draw(ms) {
+		time = Math.max(0, Math.min(totalMs, ms));
+		placed = {};
+		if (time < lettersMs) {
+			const step = Math.min(order.length - 1, Math.floor(time / stepMs));
+			const from = layouts[step], to = layouts[step + 1];
+			const progress = ease(clamp((time - step * stepMs) / (stepMs * .78)));
+			for (const char of ['p', 'm', 'd', ...order.slice(0, step)])
+				place(char, mix(from[char], to[char], progress));
+			const previous = step ? order[step - 1] : 'p';
+			const previousX = mix(from[previous], to[previous], progress);
+			const launchX = previousX + widths[previous] - 18;
+			place(order[step], mix(launchX, to[order[step]], progress), clamp((progress - .08) / .72));
+			for (const char of order.slice(step + 1)) place(char, 0, 0);
+			place('.', from.m, 0);
+		} else if (time < lettersMs + delayMs) {
+			const expanded = layouts[order.length];
+			for (const char of ['p', ...order, 'm', 'd']) place(char, expanded[char]);
+			place('.', expanded.m, 0);
+		} else {
+			const from = layouts[order.length], to = layouts[order.length + 1];
+			const progress = clamp((time - lettersMs - delayMs) / dotMs);
+			const shift = ease(progress);
+			const recoil = Math.sin(Math.PI * progress) ** 2 * bump;
+			for (const char of ['p', ...order]) place(char, mix(from[char], to[char], shift));
+			for (const char of ['m', 'd']) place(char, mix(from[char], to[char], shift) + recoil);
+			const dotScale = progress < .56
+				? mix(.2, 1.24, ease(progress / .56))
+				: mix(1.24, 1, ease((progress - .56) / .44));
+			place('.', to['.'] - recoil, clamp(progress * 4), dotScale);
+		}
+		button.classList.toggle('is-expanded', time >= lettersMs + delayMs);
+		const viewWidth = Math.ceil(placed.d + widths.d + 6);
+		svg.setAttribute('viewBox', `0 75 ${viewWidth} 130`);
+		svg.style.width = `${(viewWidth * 32 / 130).toFixed(2)}px`;
+	}
+
+	function frame(now) {
+		const elapsed = Math.min(64, Math.max(0, now - (lastFrame || now)));
+		lastFrame = now;
+		if (target > time) draw(Math.min(target, time + elapsed));
+		else if (target < time) draw(Math.max(target, time - elapsed * 2.3));
+		if (Math.abs(target - time) > .1) requestAnimationFrame(frame);
+		else { ticking = false; lastFrame = 0; }
+	}
+
+	function aim(next) {
+		target = next;
+		button.setAttribute('aria-expanded', String(target > 0));
+		if (matchMedia('(prefers-reduced-motion: reduce)').matches) { draw(next); return; }
+		if (!ticking && time !== target) { ticking = true; lastFrame = 0; requestAnimationFrame(frame); }
+	}
+
+	button.addEventListener('pointerenter', event => {
+		if (event.pointerType === 'mouse' && !pinned) aim(totalMs);
+	});
+	button.addEventListener('pointerleave', event => {
+		if (event.pointerType === 'mouse' && !pinned) aim(0);
+	});
+	button.addEventListener('focus', () => {
+		if (button.matches(':focus-visible') && !pinned) aim(totalMs);
+	});
+	button.addEventListener('blur', () => { if (!pinned) aim(0); });
+	button.addEventListener('click', () => {
+		pinned = !pinned;
+		aim(pinned ? totalMs : 0);
+	});
+	measure();
+})();
+  </script>
 </body></html>
